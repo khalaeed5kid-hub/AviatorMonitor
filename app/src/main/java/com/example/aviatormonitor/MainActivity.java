@@ -1,9 +1,11 @@
 package com.example.aviatormonitor;
 
+import android.app.Activity;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
+import android.media.projection.MediaProjectionManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -11,12 +13,14 @@ import android.provider.Settings;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
 
+    private static final int SCREEN_CAPTURE_REQ_CODE = 100;
     private Button btnStartService, btnStopService, btnCopy, btnClear;
     private TextView tvStats;
 
@@ -27,8 +31,8 @@ public class MainActivity extends AppCompatActivity {
 
         btnStartService = findViewById(R.id.btnStart);
         btnStopService = findViewById(R.id.btnStop);
-        btnCopy = findViewById(R.id.btnExport); // زر النسخ إلى الحافظة
-        btnClear = findViewById(R.id.btnClear); // زر حذف السجل
+        btnCopy = findViewById(R.id.btnExport);
+        btnClear = findViewById(R.id.btnClear);
         tvStats = findViewById(R.id.tvLog);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
@@ -37,37 +41,50 @@ public class MainActivity extends AppCompatActivity {
         }
 
         btnStartService.setOnClickListener(v -> {
-            Intent serviceIntent = new Intent(this, AviatorMonitorService.class);
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(serviceIntent);
-            } else {
-                startService(serviceIntent);
-            }
-            Toast.makeText(this, "Smart Monitor Service Started!", Toast.LENGTH_SHORT).show();
-            moveTaskToBack(true);
+            // طلب إذن التقاط الشاشة الحقيقي من أندرويد
+            MediaProjectionManager projectionManager = (MediaProjectionManager) getSystemService(Context.MEDIA_PROJECTION_SERVICE);
+            startActivityForResult(projectionManager.createScreenCaptureIntent(), SCREEN_CAPTURE_REQ_CODE);
         });
 
         btnStopService.setOnClickListener(v -> {
             stopService(new Intent(this, AviatorMonitorService.class));
-            Toast.makeText(this, "Monitor Service Stopped.", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Real Monitor Stopped.", Toast.LENGTH_SHORT).show();
             loadStats();
         });
 
-        btnCopy.setOnClickListener(v -> {
-            copyResultsToClipboard();
-        });
-
-        btnClear.setOnClickListener(v -> {
-            showClearConfirmationDialog();
-        });
+        btnCopy.setOnClickListener(v -> copyResultsToClipboard());
+        btnClear.setOnClickListener(v -> showClearConfirmationDialog());
 
         loadStats();
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == SCREEN_CAPTURE_REQ_CODE) {
+            if (resultCode == Activity.RESULT_OK && data != null) {
+                // إرسال إذن التقاط الشاشة للخدمة الخلفية لبدء العمل الحقيقي
+                Intent serviceIntent = new Intent(this, AviatorMonitorService.class);
+                serviceIntent.putExtra("code", resultCode);
+                serviceIntent.putExtra("data", data);
+                
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    startForegroundService(serviceIntent);
+                } else {
+                    startService(serviceIntent);
+                }
+                Toast.makeText(this, "Screen Capture Permission Granted! Set your area now.", Toast.LENGTH_LONG).show();
+                moveTaskToBack(true);
+            } else {
+                Toast.makeText(this, "Screen Capture Permission Denied!", Toast.LENGTH_LONG).show();
+            }
+        }
     }
 
     private void loadStats() {
         List<AviatorResult> results = AppDatabase.getDatabase(this).resultDao().getAllResults();
         StringBuilder sb = new StringBuilder();
-        sb.append("Total Confirmed Rounds: ").append(results.size()).append("\n\n");
+        sb.append("Total Recorded Rounds: ").append(results.size()).append("\n\n");
         for (AviatorResult r : results) {
             sb.append("Round ").append(r.roundNumber).append(": ").append(String.format(java.util.Locale.getDefault(), "%.2f", r.multiplier)).append("x [").append(r.timestamp).append("]\n");
         }
@@ -87,7 +104,7 @@ public class MainActivity extends AppCompatActivity {
         ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
         ClipData clip = ClipData.newPlainText("Aviator Results", sb.toString());
         clipboard.setPrimaryClip(clip);
-        Toast.makeText(this, "All results copied to clipboard!", Toast.LENGTH_LONG).show();
+        Toast.makeText(this, "Copied to clipboard!", Toast.LENGTH_LONG).show();
     }
 
     private void showClearConfirmationDialog() {
@@ -97,7 +114,7 @@ public class MainActivity extends AppCompatActivity {
                 .setPositiveButton("Yes", (dialog, which) -> {
                     AppDatabase.getDatabase(this).resultDao().deleteAll();
                     loadStats();
-                    Toast.makeText(this, "All records deleted.", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Deleted.", Toast.LENGTH_SHORT).show();
                 })
                 .setNegativeButton("No", null)
                 .show();
