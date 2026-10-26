@@ -9,41 +9,44 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Aviator Monitor Dashboard"
+        android:text="Aviator Pro Dashboard"
         android:textSize="22sp"
         android:textStyle="bold"
-        android:layout_marginBottom="24dp"/>
+        android:layout_marginBottom="16dp"/>
 
     <Button
         android:id="@+id/btnStart"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Start Floating Monitor"
-        android:textSize="16sp"
-        android:layout_marginBottom="12dp"/>
+        android:text="Start Floating Monitor Service"
+        android:layout_marginBottom="8dp"/>
+
+    <Button
+        android:id="@+id/btnStop"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Stop Monitor Service"
+        android:layout_marginBottom="8dp"/>
 
     <Button
         android:id="@+id/btnExport"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Export Data (CSV)"
-        android:textSize="16sp"
-        android:layout_marginBottom="24dp"/>
+        android:layout_marginBottom="16dp"/>
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Recent Results Log:"
-        android:textSize="16sp"
+        android:text="Database &amp; Statistics Log:"
         android:textStyle="bold"
-        android:layout_marginBottom="8dp"/>
+        android:layout_marginBottom="4dp"/>
 
     <TextView
         android:id="@+id/tvLog"
         android:layout_width="match_parent"
-        android:layout_height="200dp"
-        android:text="System ready. Click Start to launch floating widget.\n"
-        android:textSize="14sp"
+        android:layout_height="250dp"
+        android:text="No data recorded yet."
         android:background="#22000000"
         android:padding="8dp"
         android:scrollbars="vertical"/>
