@@ -24,7 +24,7 @@ public class CropOverlayView extends View {
         this.listener = listener;
 
         bgPaint = new Paint();
-        bgPaint.setColor(Color.argb(120, 0, 0, 0));
+        bgPaint.setColor(Color.argb(140, 0, 0, 0));
 
         rectPaint = new Paint();
         rectPaint.setColor(Color.YELLOW);
@@ -33,7 +33,7 @@ public class CropOverlayView extends View {
 
         textPaint = new Paint();
         textPaint.setColor(Color.WHITE);
-        textPaint.setTextSize(40f);
+        textPaint.setTextSize(45f);
         textPaint.setAntiAlias(true);
     }
 
@@ -49,9 +49,9 @@ public class CropOverlayView extends View {
             float bottom = Math.max(startY, endY);
 
             canvas.drawRect(left, top, right, bottom, rectPaint);
-            canvas.drawText("Release to confirm region", 50, 150, textPaint);
+            canvas.drawText("Release to set Aviator area", 50, 150, textPaint);
         } else {
-            canvas.drawText("Drag your finger to select Aviator area", 50, 150, textPaint);
+            canvas.drawText("Drag finger to select Aviator multiplier area", 50, 150, textPaint);
         }
     }
 
