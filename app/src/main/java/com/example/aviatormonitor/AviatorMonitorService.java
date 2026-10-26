@@ -14,6 +14,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.Toast;
 import androidx.core.app.NotificationCompat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -26,11 +27,10 @@ public class AviatorMonitorService extends Service {
     private boolean isMonitoring = false;
     private int roundCounter = 1;
     
-    // متغيرات خوارزمية الثبات (فحص كل 0.5 ثانية وتكرار 3 مرات)
     private Handler handler = new Handler();
     private String lastDetectedText = "";
-    private int stableCount = 0;
-    private double lastSavedMultiplier = 0.0;
+    private boolean wasMultiplierActive = false;
+    private String lastValidMultiplier = "";
 
     @Override
     public IBinder onBind(Intent intent) {
@@ -48,13 +48,13 @@ public class AviatorMonitorService extends Service {
     private Notification createNotification() {
         String channelId = "aviator_channel";
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel channel = new NotificationChannel(channelId, "Aviator Smart Monitor", NotificationManager.IMPORTANCE_LOW);
+            NotificationChannel channel = new NotificationChannel(channelId, "Aviator Region Monitor", NotificationManager.IMPORTANCE_LOW);
             NotificationManager manager = getSystemService(NotificationManager.class);
             if (manager != null) manager.createNotificationChannel(channel);
         }
         return new NotificationCompat.Builder(this, channelId)
-                .setContentTitle("Aviator Smart Monitor Active")
-                .setContentText("Smart OCR & Stable Logic running...")
+                .setContentTitle("Aviator Monitor Active")
+                .setContentText("Floating widget & region detection ready...")
                 .setSmallIcon(android.R.drawable.ic_menu_camera)
                 .build();
     }
@@ -63,9 +63,9 @@ public class AviatorMonitorService extends Service {
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
         
         Button floatBtn = new Button(this);
-        floatBtn.setText("🔴 ON");
+        floatBtn.setText("🎯 SET");
         floatBtn.setTextSize(14);
-        floatBtn.setBackgroundColor(0xFFFF0000);
+        floatBtn.setBackgroundColor(0xFFFF9800); // لون برتقالي لتحديد المنطقة والتحكم
         floatBtn.setTextColor(0xFFFFFFFF);
 
         final WindowManager.LayoutParams params = new WindowManager.LayoutParams(
@@ -102,6 +102,7 @@ public class AviatorMonitorService extends Service {
                         return true;
                     case MotionEvent.ACTION_UP:
                         if (Math.abs(event.getRawX() - initialTouchX) < 10 && Math.abs(event.getRawY() - initialTouchY) < 10) {
+                            // الضغطة المفردة تفعل أو توقف المراقبة / أو تفتح وضع تحديد المنطقة
                             toggleMonitoringState(floatBtn);
                         }
                         return true;
@@ -117,54 +118,62 @@ public class AviatorMonitorService extends Service {
     private void toggleMonitoringState(Button btn) {
         isMonitoring = !isMonitoring;
         if (isMonitoring) {
-            btn.setText("🟢 ACTIVE");
+            btn.setText("🟢 RUN");
             btn.setBackgroundColor(0xFF00FF00);
+            Toast.makeText(this, "Region Monitoring Started!", Toast.LENGTH_SHORT).show();
         } else {
-            btn.setText("🔴 PAUSED");
-            btn.setBackgroundColor(0xFFFF0000);
+            btn.setText("🎯 SET");
+            btn.setBackgroundColor(0xFFFF9800);
+            Toast.makeText(this, "Monitoring Paused.", Toast.LENGTH_SHORT).show();
         }
     }
 
-    // خوارزمية الفحص الذكي كل 500 ملي ثانية (نصف ثانية)
+    // خوارزمية الفحص الذكي وكشف الانتقال للعد التنازلي كل نصف ثانية
     private void startSmartMonitoringLoop() {
         handler.postDelayed(new Runnable() {
             @Override
             public void run() {
                 if (isMonitoring) {
-                    processScreenOCRAndStability();
+                    checkScreenTransitionAndCapture();
                 }
-                handler.postDelayed(this, 500); // تكرار الفحص كل نصف ثانية
+                handler.postDelayed(this, 500); // كل نصف ثانية
             }
         }, 500);
     }
 
-    private void processScreenOCRAndStability() {
-        // محاكاة قراءة الشاشة وتحليل الكاميرا/OCR (يمكن ربطها لاحقاً بالتقاط الشاشة الفعلي)
-        // هنا نقوم بتطبيق منطق الثبات الذي اكتشفته: إذا ثبت الرقم لـ 3 دورات فحص متتالية (ثانيتين) يُعتبر نهائياً
-        
-        String simulatedCurrentDetected = simulateOCRRead();
+    private void checkScreenTransitionAndCapture() {
+        // محاكاة قراءة المنطقة المحددة من الشاشة (OCR Simulation)
+        // في التطبيق العملي، هنا يتم التقاط مستطيل الشاشة المحدد وتحليله
+        String currentRead = simulateRegionOCR();
 
-        if (simulatedCurrentDetected.equals(lastDetectedText)) {
-            stableCount++;
-            // إذا تكرر الرقم في 3 فترات فحص متطابقة (ثانيتين تقريباً) ولم يتم حفظه مسبقاً
-            if (stableCount >= 3) {
-                double parsedMultiplier = parseMultiplier(simulatedCurrentDetected);
-                if (parsedMultiplier > 0 && parsedMultiplier != lastSavedMultiplier) {
-                    saveConfirmedResult(parsedMultiplier);
-                    lastSavedMultiplier = parsedMultiplier;
-                }
-            }
+        boolean isCountdown = currentRead.contains("s") || currentRead.contains("0.00") || currentRead.equals("countdown");
+
+        if (!isCountdown) {
+            // الرقم نشط وموجود (الطائرة تطير أو المضاعف يرتفع)
+            wasMultiplierActive = true;
+            lastValidMultiplier = currentRead;
         } else {
-            // الرقم يتغير (الطائرة تطير والجولة مستمرة)
-            lastDetectedText = simulatedCurrentDetected;
-            stableCount = 1;
+            // ظهر العد التنازلي أو اختفى الرقم! وهذا يعني انتهاء الجولة فوراً
+            if (wasMultiplierActive && !lastValidMultiplier.isEmpty()) {
+                double parsed = parseMultiplier(lastValidMultiplier);
+                if (parsed > 1.0) {
+                    saveConfirmedResult(parsed);
+                }
+                wasMultiplierActive = false;
+                lastValidMultiplier = "";
+            }
         }
     }
 
-    private String simulateOCRRead() {
-        // محاكاة مؤقتة للقراءة البصرية (ستستبدل بالتقاط MediaProjection الفعلي)
-        double val = 1.0 + (Math.random() * 8.0);
-        return String.format(Locale.getDefault(), "%.2fx", val);
+    private String simulateRegionOCR() {
+        // محاكاة لحالات الشاشة (حسب اختبارك): أرقام تصعد ثم ظهور العد التنازلي
+        double rand = Math.random();
+        if (rand > 0.7) {
+            return "countdown"; // مؤشر ظهور العد التنازلي واننهاء الجولة
+        } else {
+            double val = 1.1 + (rand * 10.0);
+            return String.format(Locale.getDefault(), "%.2fx", val);
+        }
     }
 
     private double parseMultiplier(String text) {
