@@ -5,22 +5,18 @@ import androidx.room.Database;
 import androidx.room.Room;
 import androidx.room.RoomDatabase;
 
-@Database(entities = {AviatorResult.class}, version = 1, exportSchema = false)
+@Database(entities = {AviatorResult.class}, version = 1)
 public abstract class AppDatabase extends RoomDatabase {
     public abstract ResultDao resultDao();
+    private static AppDatabase INSTANCE;
 
-    private static volatile AppDatabase INSTANCE;
-
-    public static AppDatabase getDatabase(final Context context) {
+    public static synchronized AppDatabase getInstance(Context context) {
         if (INSTANCE == null) {
-            synchronized (AppDatabase.class) {
-                if (INSTANCE == null) {
-                    INSTANCE = Room.databaseBuilder(context.getApplicationContext(),
-                            AppDatabase.class, "aviator_database")
-                            .allowMainThreadQueries()
-                            .build();
-                }
-            }
+            INSTANCE = Room.databaseBuilder(context.getApplicationContext(),
+                    AppDatabase.class, "aviator_db")
+                    .allowMainThreadQueries()
+                    .fallbackToDestructiveMigration()
+                    .build();
         }
         return INSTANCE;
     }
