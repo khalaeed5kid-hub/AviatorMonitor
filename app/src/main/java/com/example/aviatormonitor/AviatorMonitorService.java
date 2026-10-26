@@ -25,10 +25,8 @@ import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.Toast;
-import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
 import com.google.mlkit.vision.common.InputImage;
-import com.google.mlkit.vision.text.Text;
 import com.google.mlkit.vision.text.TextRecognition;
 import com.google.mlkit.vision.text.TextRecognizer;
 import java.nio.ByteBuffer;
@@ -42,7 +40,6 @@ public class AviatorMonitorService extends Service {
     private View floatingButtonView;
     private CropOverlayView cropOverlayView;
     
-    private MediaProjectionManager projectionManager;
     private MediaProjection mediaProjection;
     private VirtualDisplay virtualDisplay;
     private ImageReader imageReader;
@@ -73,7 +70,7 @@ public class AviatorMonitorService extends Service {
 
             startForeground(1, createNotification());
             
-            projectionManager = (MediaProjectionManager) getSystemService(Context.MEDIA_PROJECTION_SERVICE);
+            MediaProjectionManager projectionManager = (MediaProjectionManager) getSystemService(Context.MEDIA_PROJECTION_SERVICE);
             if (projectionManager != null && data != null) {
                 mediaProjection = projectionManager.getMediaProjection(resultCode, data);
                 setupVirtualDisplay();
@@ -84,15 +81,15 @@ public class AviatorMonitorService extends Service {
     }
 
     private Notification createNotification() {
-        String channelId = "aviator_real_channel";
+        String channelId = "aviator_final_channel";
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel channel = new NotificationChannel(channelId, "Aviator Real Monitor", NotificationManager.IMPORTANCE_LOW);
+            NotificationChannel channel = new NotificationChannel(channelId, "Aviator Final Tracker", NotificationManager.IMPORTANCE_LOW);
             NotificationManager manager = getSystemService(NotificationManager.class);
             if (manager != null) manager.createNotificationChannel(channel);
         }
         return new NotificationCompat.Builder(this, channelId)
-                .setContentTitle("Aviator Real Tracker Active")
-                .setContentText("Screen capture running. Tap button to set area.")
+                .setContentTitle("Aviator Tracker Running")
+                .setContentText("Tap floating button to select area.")
                 .setSmallIcon(android.R.drawable.ic_menu_camera)
                 .build();
     }
@@ -172,8 +169,8 @@ public class AviatorMonitorService extends Service {
             windowManager.removeView(cropOverlayView);
             cropOverlayView = null;
             
-            Toast.makeText(getApplicationContext(), "Region Set! Real OCR Monitoring started...", Toast.LENGTH_LONG).show();
-            startRealScreenMonitoring();
+            Toast.makeText(getApplicationContext(), "Area Set! Monitoring Active...", Toast.LENGTH_LONG).show();
+            startMonitoringLoop();
         });
 
         WindowManager.LayoutParams overlayParams = new WindowManager.LayoutParams(
@@ -189,7 +186,7 @@ public class AviatorMonitorService extends Service {
         windowManager.addView(cropOverlayView, overlayParams);
     }
 
-    private void startRealScreenMonitoring() {
+    private void startMonitoringLoop() {
         isMonitoring = true;
         if (floatingButtonView instanceof Button) {
             ((Button) floatingButtonView).setText("🟢 LIVE");
@@ -200,14 +197,14 @@ public class AviatorMonitorService extends Service {
             @Override
             public void run() {
                 if (isMonitoring) {
-                    captureAndProcessRealScreen();
-                    handler.postDelayed(this, 1000); // فحص كل ثانية حقيقية
+                    captureAndProcessScreen();
+                    handler.postDelayed(this, 1000); // فحص كل ثانية
                 }
             }
         }, 1000);
     }
 
-    private void captureAndProcessRealScreen() {
+    private void captureAndProcessScreen() {
         if (imageReader == null || selectedRegion == null) return;
 
         Image image = imageReader.acquireLatestImage();
@@ -224,7 +221,6 @@ public class AviatorMonitorService extends Service {
             bitmap.copyPixelsFromBuffer(buffer);
             image.close();
 
-            // قص المنطقة المحددة فقط التي رسمتها أنت
             int cropX = Math.max(0, selectedRegion.left);
             int cropY = Math.max(0, selectedRegion.top);
             int cropW = Math.min(selectedRegion.width(), bitmap.getWidth() - cropX);
@@ -234,30 +230,27 @@ public class AviatorMonitorService extends Service {
 
             Bitmap croppedBitmap = Bitmap.createBitmap(bitmap, cropX, cropY, cropW, cropH);
 
-            // تحليل النصوص الحقيقية عبر OCR
             InputImage inputImage = InputImage.fromBitmap(croppedBitmap, 0);
             textRecognizer.process(inputImage)
-                    .addOnSuccessListener(result -> analyzeOcrText(result.getText()))
-                    .addOnFailureListener(e -> {});
+                    .addOnSuccessListener(result -> analyzeText(result.getText()))
+                    .addOnFailureListener(e => {});
 
         } catch (Exception e) {
             image.close();
         }
     }
 
-    private void analyzeOcrText(String recognizedText) {
+    private void analyzeText(String recognizedText) {
         if (recognizedText == null) return;
         String cleanText = recognizedText.trim();
 
-        // هل ظهر العد التنازلي (مثل رقم 1 أو 2 أو 3 أو كلمة s) واختفى المضاعف؟
+        // فحص ظهور العد التنازلي أو اختفاء المضاعف
         boolean isCountdown = cleanText.matches("^[0-9]$") || cleanText.contains("s") || cleanText.isEmpty();
 
         if (!isCountdown && cleanText.contains("x")) {
-            // الرقم أو المضاعف ظاهر ومستمر (مثل 1.18x)
             wasMultiplierActive = true;
             lastValidMultiplier = cleanText;
         } else if (isCountdown && wasMultiplierActive) {
-            // ظهر العد التنازلي واختفى المضاعف! -> احفظ آخر رقم صحيح فوراً
             double parsed = parseMultiplier(lastValidMultiplier);
             if (parsed > 1.0) {
                 saveConfirmedResult(parsed);
