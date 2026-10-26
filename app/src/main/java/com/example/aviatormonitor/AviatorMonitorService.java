@@ -7,6 +7,7 @@ import android.app.Service;
 import android.content.Intent;
 import android.graphics.PixelFormat;
 import android.os.Build;
+import android.os.Handler;
 import android.os.IBinder;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -22,8 +23,14 @@ public class AviatorMonitorService extends Service {
 
     private WindowManager windowManager;
     private View floatingView;
-    private boolean isRecording = false;
+    private boolean isMonitoring = false;
     private int roundCounter = 1;
+    
+    // متغيرات خوارزمية الثبات (فحص كل 0.5 ثانية وتكرار 3 مرات)
+    private Handler handler = new Handler();
+    private String lastDetectedText = "";
+    private int stableCount = 0;
+    private double lastSavedMultiplier = 0.0;
 
     @Override
     public IBinder onBind(Intent intent) {
@@ -35,18 +42,19 @@ public class AviatorMonitorService extends Service {
         super.onCreate();
         startForeground(1, createNotification());
         createFloatingWidget();
+        startSmartMonitoringLoop();
     }
 
     private Notification createNotification() {
         String channelId = "aviator_channel";
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel channel = new NotificationChannel(channelId, "Aviator Monitor Service", NotificationManager.IMPORTANCE_LOW);
+            NotificationChannel channel = new NotificationChannel(channelId, "Aviator Smart Monitor", NotificationManager.IMPORTANCE_LOW);
             NotificationManager manager = getSystemService(NotificationManager.class);
             if (manager != null) manager.createNotificationChannel(channel);
         }
         return new NotificationCompat.Builder(this, channelId)
-                .setContentTitle("Aviator Monitor Active")
-                .setContentText("Floating control widget is running...")
+                .setContentTitle("Aviator Smart Monitor Active")
+                .setContentText("Smart OCR & Stable Logic running...")
                 .setSmallIcon(android.R.drawable.ic_menu_camera)
                 .build();
     }
@@ -55,7 +63,7 @@ public class AviatorMonitorService extends Service {
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
         
         Button floatBtn = new Button(this);
-        floatBtn.setText("🔴 REC");
+        floatBtn.setText("🔴 ON");
         floatBtn.setTextSize(14);
         floatBtn.setBackgroundColor(0xFFFF0000);
         floatBtn.setTextColor(0xFFFFFFFF);
@@ -94,7 +102,7 @@ public class AviatorMonitorService extends Service {
                         return true;
                     case MotionEvent.ACTION_UP:
                         if (Math.abs(event.getRawX() - initialTouchX) < 10 && Math.abs(event.getRawY() - initialTouchY) < 10) {
-                            toggleRecordingState(floatBtn);
+                            toggleMonitoringState(floatBtn);
                         }
                         return true;
                 }
@@ -106,22 +114,70 @@ public class AviatorMonitorService extends Service {
         windowManager.addView(floatingView, params);
     }
 
-    private void toggleRecordingState(Button btn) {
-        isRecording = !isRecording;
-        if (isRecording) {
-            btn.setText("🟢 PAUSE");
+    private void toggleMonitoringState(Button btn) {
+        isMonitoring = !isMonitoring;
+        if (isMonitoring) {
+            btn.setText("🟢 ACTIVE");
             btn.setBackgroundColor(0xFF00FF00);
-            captureResult();
         } else {
-            btn.setText("🔴 REC");
+            btn.setText("🔴 PAUSED");
             btn.setBackgroundColor(0xFFFF0000);
         }
     }
 
-    private void captureResult() {
-        String timeStamp = new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date());
-        double multiplier = 1.10 + (Math.random() * 10.0); // التقاط محاكي دقيق للمضاعف النهائي
+    // خوارزمية الفحص الذكي كل 500 ملي ثانية (نصف ثانية)
+    private void startSmartMonitoringLoop() {
+        handler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if (isMonitoring) {
+                    processScreenOCRAndStability();
+                }
+                handler.postDelayed(this, 500); // تكرار الفحص كل نصف ثانية
+            }
+        }, 500);
+    }
 
+    private void processScreenOCRAndStability() {
+        // محاكاة قراءة الشاشة وتحليل الكاميرا/OCR (يمكن ربطها لاحقاً بالتقاط الشاشة الفعلي)
+        // هنا نقوم بتطبيق منطق الثبات الذي اكتشفته: إذا ثبت الرقم لـ 3 دورات فحص متتالية (ثانيتين) يُعتبر نهائياً
+        
+        String simulatedCurrentDetected = simulateOCRRead();
+
+        if (simulatedCurrentDetected.equals(lastDetectedText)) {
+            stableCount++;
+            // إذا تكرر الرقم في 3 فترات فحص متطابقة (ثانيتين تقريباً) ولم يتم حفظه مسبقاً
+            if (stableCount >= 3) {
+                double parsedMultiplier = parseMultiplier(simulatedCurrentDetected);
+                if (parsedMultiplier > 0 && parsedMultiplier != lastSavedMultiplier) {
+                    saveConfirmedResult(parsedMultiplier);
+                    lastSavedMultiplier = parsedMultiplier;
+                }
+            }
+        } else {
+            // الرقم يتغير (الطائرة تطير والجولة مستمرة)
+            lastDetectedText = simulatedCurrentDetected;
+            stableCount = 1;
+        }
+    }
+
+    private String simulateOCRRead() {
+        // محاكاة مؤقتة للقراءة البصرية (ستستبدل بالتقاط MediaProjection الفعلي)
+        double val = 1.0 + (Math.random() * 8.0);
+        return String.format(Locale.getDefault(), "%.2fx", val);
+    }
+
+    private double parseMultiplier(String text) {
+        try {
+            String clean = text.replace("x", "").trim();
+            return Double.parseDouble(clean);
+        } catch (Exception e) {
+            return 0.0;
+        }
+    }
+
+    private void saveConfirmedResult(double multiplier) {
+        String timeStamp = new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date());
         AviatorResult result = new AviatorResult(multiplier, timeStamp, roundCounter++, true);
         AppDatabase.getDatabase(getApplicationContext()).resultDao().insert(result);
     }
@@ -129,6 +185,7 @@ public class AviatorMonitorService extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
+        handler.removeCallbacksAndMessages(null);
         if (windowManager != null && floatingView != null) {
             windowManager.removeView(floatingView);
         }
