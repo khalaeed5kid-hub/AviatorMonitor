@@ -29,6 +29,7 @@ import androidx.core.app.NotificationCompat;
 import com.google.mlkit.vision.common.InputImage;
 import com.google.mlkit.vision.text.TextRecognition;
 import com.google.mlkit.vision.text.TextRecognizer;
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions;
 import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -59,7 +60,7 @@ public class AviatorMonitorService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
-        textRecognizer = TextRecognition.getClient(com.google.mlkit.vision.text.latin.TextRecognizerOptions.DEFAULT_OPTIONS);
+        textRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS);
     }
 
     @Override
@@ -72,7 +73,7 @@ public class AviatorMonitorService extends Service {
             
             MediaProjectionManager projectionManager = (MediaProjectionManager) getSystemService(Context.MEDIA_PROJECTION_SERVICE);
             if (projectionManager != null && data != null) {
-                mediaProjection = projectionManager.getMediaProjection(resultCode, data);
+                mediaProjection = projectionManager.createMediaProjection(resultCode, data);
                 setupVirtualDisplay();
             }
             createFloatingControlWidget();
@@ -198,7 +199,7 @@ public class AviatorMonitorService extends Service {
             public void run() {
                 if (isMonitoring) {
                     captureAndProcessScreen();
-                    handler.postDelayed(this, 1000); // فحص كل ثانية
+                    handler.postDelayed(this, 1000);
                 }
             }
         }, 1000);
@@ -233,7 +234,7 @@ public class AviatorMonitorService extends Service {
             InputImage inputImage = InputImage.fromBitmap(croppedBitmap, 0);
             textRecognizer.process(inputImage)
                     .addOnSuccessListener(result -> analyzeText(result.getText()))
-                    .addOnFailureListener(e => {});
+                    .addOnFailureListener(e -> {});
 
         } catch (Exception e) {
             image.close();
@@ -244,7 +245,6 @@ public class AviatorMonitorService extends Service {
         if (recognizedText == null) return;
         String cleanText = recognizedText.trim();
 
-        // فحص ظهور العد التنازلي أو اختفاء المضاعف
         boolean isCountdown = cleanText.matches("^[0-9]$") || cleanText.contains("s") || cleanText.isEmpty();
 
         if (!isCountdown && cleanText.contains("x")) {
