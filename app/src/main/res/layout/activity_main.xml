@@ -9,7 +9,7 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Aviator Pro Dashboard"
+        android:text="Aviator Smart Tracker"
         android:textSize="22sp"
         android:textStyle="bold"
         android:layout_marginBottom="16dp"/>
@@ -18,34 +18,41 @@
         android:id="@+id/btnStart"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Start Floating Monitor Service"
-        android:layout_marginBottom="8dp"/>
+        android:text="Start Smart Monitor Service"
+        android:layout_marginBottom="6dp"/>
 
     <Button
         android:id="@+id/btnStop"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Stop Monitor Service"
-        android:layout_marginBottom="8dp"/>
+        android:layout_marginBottom="6dp"/>
 
     <Button
         android:id="@+id/btnExport"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Export Data (CSV)"
+        android:text="Copy Results to Clipboard"
+        android:layout_marginBottom="6dp"/>
+
+    <Button
+        android:id="@+id/btnClear"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Clear All Logs"
         android:layout_marginBottom="16dp"/>
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Database &amp; Statistics Log:"
+        android:text="Confirmed Rounds &amp; Statistics:"
         android:textStyle="bold"
         android:layout_marginBottom="4dp"/>
 
     <TextView
         android:id="@+id/tvLog"
         android:layout_width="match_parent"
-        android:layout_height="250dp"
+        android:layout_height="220dp"
         android:text="No data recorded yet."
         android:background="#22000000"
         android:padding="8dp"
